@@ -291,6 +291,9 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
             case ControlMessage.TYPE_INJECT_CURSOR:
                 handleCursor(msg);
                 break;
+            case ControlMessage.TYPE_SET_CURSOR_CONFIG:
+                handleCursorConfig(msg);
+                break;
             case ControlMessage.TYPE_BACK_OR_SCREEN_ON:
                 if (supportsInputEvents) {
                     pressBackOrTurnScreenOn(msg.getAction());
@@ -405,6 +408,14 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
 
         Point mappedPoint = pair.first;
         cursorOverlay.show(mappedPoint.getX(), mappedPoint.getY());
+    }
+
+    private void handleCursorConfig(ControlMessage msg) {
+        try {
+            cursorOverlay.setCursorSize(msg.getCursorSizePx());
+        } catch (RuntimeException e) {
+            Ln.w("Failed to apply cursor config", e);
+        }
     }
 
     private Pair<Point, Integer> getEventPointAndDisplayId(Position position) {

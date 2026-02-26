@@ -35,6 +35,8 @@ public class ControlMessageReader {
                 return parseInjectScrollEvent();
             case ControlMessage.TYPE_INJECT_CURSOR:
                 return parseInjectCursor();
+            case ControlMessage.TYPE_SET_CURSOR_CONFIG:
+                return parseSetCursorConfig();
             case ControlMessage.TYPE_BACK_OR_SCREEN_ON:
                 return parseBackOrScreenOnEvent();
             case ControlMessage.TYPE_GET_CLIPBOARD:
@@ -127,6 +129,11 @@ public class ControlMessageReader {
         int w = dis.readInt();
         int h = dis.readInt();
         return ControlMessage.createInjectCursor(x, y, w, h);
+    }
+
+    private ControlMessage parseSetCursorConfig() throws IOException {
+        int cursorSizePx = dis.readInt();
+        return ControlMessage.createSetCursorConfig(cursorSizePx);
     }
 
     private ControlMessage parseBackOrScreenOnEvent() throws IOException {

@@ -15,7 +15,9 @@ import java.lang.reflect.Method;
 
 final class CursorOverlay {
 
-    private static final int CURSOR_SIZE = 24;
+    private static final int CURSOR_SIZE_DEFAULT = 24;
+    private static final int CURSOR_SIZE_MIN = 8;
+    private static final int CURSOR_SIZE_MAX = 128;
     private static final int CURSOR_LAYER = Integer.MAX_VALUE - 100;
 
     private static final class Reflection {
@@ -94,6 +96,7 @@ final class CursorOverlay {
     private boolean initialized;
     private boolean visible;
     private boolean disabled;
+    private int cursorSizePx = CURSOR_SIZE_DEFAULT;
     private int lastX = Integer.MIN_VALUE;
     private int lastY = Integer.MIN_VALUE;
 
@@ -110,7 +113,7 @@ final class CursorOverlay {
     }
 
     public synchronized void show(int x, int y) {
-        if (!ensureInitialized()) {
+        if (!ensureInitializedLocked()) {
             return;
         }
 
@@ -137,35 +140,43 @@ final class CursorOverlay {
         }
     }
 
+    public synchronized void setCursorSize(int sizePx) {
+        int clamped = Math.max(CURSOR_SIZE_MIN, Math.min(CURSOR_SIZE_MAX, sizePx));
+        if (cursorSizePx == clamped) {
+            return;
+        }
+
+        cursorSizePx = clamped;
+        if (!initialized) {
+            return;
+        }
+
+        boolean wasVisible = visible;
+        int x = lastX;
+        int y = lastY;
+
+        if (!recreateSurfaceLocked()) {
+            return;
+        }
+
+        if (wasVisible && x != Integer.MIN_VALUE && y != Integer.MIN_VALUE) {
+            if (applyTransaction(x, y, true)) {
+                visible = true;
+                lastX = x;
+                lastY = y;
+            }
+        }
+    }
+
     public synchronized void release() {
         if (!initialized) {
             return;
         }
 
-        hide();
-        tryRemoveLayer();
-
-        if (surface != null) {
-            surface.release();
-            surface = null;
-        }
-
-        if (surfaceControl != null && reflection.surfaceControlRelease != null) {
-            try {
-                reflection.surfaceControlRelease.invoke(surfaceControl);
-            } catch (ReflectiveOperationException e) {
-                Ln.w("Could not release cursor SurfaceControl", e);
-            }
-        }
-
-        surfaceControl = null;
-        initialized = false;
-        visible = false;
-        lastX = Integer.MIN_VALUE;
-        lastY = Integer.MIN_VALUE;
+        destroySurfaceLocked(true);
     }
 
-    private boolean ensureInitialized() {
+    private boolean ensureInitializedLocked() {
         if (initialized) {
             return true;
         }
@@ -174,10 +185,17 @@ final class CursorOverlay {
             return false;
         }
 
+        return recreateSurfaceLocked();
+    }
+
+    private boolean recreateSurfaceLocked() {
+        // Keep all create/release operations under the same monitor to avoid races with show/hide.
+        destroySurfaceLocked(false);
+
         try {
             Object builder = reflection.builderConstructor.newInstance();
             reflection.builderSetName.invoke(builder, "scrcpy-cursor-overlay");
-            reflection.builderSetBufferSize.invoke(builder, CURSOR_SIZE, CURSOR_SIZE);
+            reflection.builderSetBufferSize.invoke(builder, cursorSizePx, cursorSizePx);
             if (reflection.builderSetFormat != null) {
                 reflection.builderSetFormat.invoke(builder, PixelFormat.RGBA_8888);
             }
@@ -191,11 +209,41 @@ final class CursorOverlay {
 
             drawPointerOnce();
             initialized = true;
+            visible = false;
             return true;
         } catch (ReflectiveOperationException e) {
             Ln.w("Cursor overlay disabled: could not initialize", e);
             disabled = true;
+            destroySurfaceLocked(false);
             return false;
+        }
+    }
+
+    private void destroySurfaceLocked(boolean resetCoordinates) {
+        if (initialized && visible) {
+            applyTransaction(lastX, lastY, false);
+        }
+        tryRemoveLayer();
+
+        if (surface != null) {
+            surface.release();
+            surface = null;
+        }
+
+        if (surfaceControl != null && reflection != null && reflection.surfaceControlRelease != null) {
+            try {
+                reflection.surfaceControlRelease.invoke(surfaceControl);
+            } catch (ReflectiveOperationException e) {
+                Ln.w("Could not release cursor SurfaceControl", e);
+            }
+        }
+
+        surfaceControl = null;
+        initialized = false;
+        visible = false;
+        if (resetCoordinates) {
+            lastX = Integer.MIN_VALUE;
+            lastY = Integer.MIN_VALUE;
         }
     }
 
@@ -214,10 +262,11 @@ final class CursorOverlay {
             outline.setStrokeWidth(1.5f);
             outline.setColor(Color.WHITE);
 
+            float size = cursorSizePx;
             Path arrow = new Path();
             arrow.moveTo(2f, 2f);
-            arrow.lineTo(2f, CURSOR_SIZE - 4f);
-            arrow.lineTo(CURSOR_SIZE * 0.52f, CURSOR_SIZE * 0.64f);
+            arrow.lineTo(2f, size - 4f);
+            arrow.lineTo(size * 0.52f, size * 0.64f);
             arrow.close();
 
             canvas.drawPath(arrow, fill);
@@ -253,7 +302,7 @@ final class CursorOverlay {
     }
 
     private void tryRemoveLayer() {
-        if (surfaceControl == null || reflection.transactionRemove == null) {
+        if (surfaceControl == null || reflection == null || reflection.transactionRemove == null) {
             return;
         }
 

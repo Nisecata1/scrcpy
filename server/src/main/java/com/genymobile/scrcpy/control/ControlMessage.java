@@ -26,6 +26,7 @@ public final class ControlMessage {
     public static final int TYPE_START_APP = 16;
     public static final int TYPE_RESET_VIDEO = 17;
     public static final int TYPE_INJECT_CURSOR = 0x80;
+    public static final int TYPE_SET_CURSOR_CONFIG = 0x81;
 
     public static final long SEQUENCE_INVALID = 0;
 
@@ -58,6 +59,7 @@ public final class ControlMessage {
     private int cursorY;
     private int cursorW;
     private int cursorH;
+    private int cursorSizePx;
 
     private ControlMessage() {
     }
@@ -181,6 +183,13 @@ public final class ControlMessage {
         return msg;
     }
 
+    public static ControlMessage createSetCursorConfig(int cursorSizePx) {
+        ControlMessage msg = new ControlMessage();
+        msg.type = TYPE_SET_CURSOR_CONFIG;
+        msg.cursorSizePx = cursorSizePx;
+        return msg;
+    }
+
     public int getType() {
         return type;
     }
@@ -279,5 +288,9 @@ public final class ControlMessage {
 
     public int getCursorH() {
         return cursorH;
+    }
+
+    public int getCursorSizePx() {
+        return cursorSizePx;
     }
 }
