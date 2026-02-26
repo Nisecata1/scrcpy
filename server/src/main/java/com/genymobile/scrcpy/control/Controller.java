@@ -100,6 +100,8 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
     // Used for resetting video encoding on RESET_VIDEO message
     private SurfaceCapture surfaceCapture;
 
+    private final CursorOverlay cursorOverlay = new CursorOverlay();
+
     public Controller(ControlChannel controlChannel, CleanUp cleanUp, Options options) {
         this.displayId = options.getDisplayId();
         this.controlChannel = controlChannel;
@@ -232,6 +234,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
                 if (uhidManager != null) {
                     uhidManager.closeAll();
                 }
+                cursorOverlay.release();
                 listener.onTerminated(true);
             }
         }, "control-recv");
@@ -284,6 +287,9 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
                 if (supportsInputEvents) {
                     injectScroll(msg.getPosition(), msg.getHScroll(), msg.getVScroll(), msg.getButtons());
                 }
+                break;
+            case ControlMessage.TYPE_INJECT_CURSOR:
+                handleCursor(msg);
                 break;
             case ControlMessage.TYPE_BACK_OR_SCREEN_ON:
                 if (supportsInputEvents) {
@@ -373,6 +379,32 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
             successCount++;
         }
         return successCount;
+    }
+
+    private void handleCursor(ControlMessage msg) {
+        int x = msg.getCursorX();
+        int y = msg.getCursorY();
+
+        if (x < 0 || y < 0) {
+            cursorOverlay.hide();
+            return;
+        }
+
+        int w = msg.getCursorW();
+        int h = msg.getCursorH();
+        if (w <= 0 || h <= 0) {
+            Ln.w("Ignore cursor packet with invalid size: " + w + "x" + h);
+            return;
+        }
+
+        Position position = new Position(x, y, w, h);
+        Pair<Point, Integer> pair = getEventPointAndDisplayId(position);
+        if (pair == null) {
+            return;
+        }
+
+        Point mappedPoint = pair.first;
+        cursorOverlay.show(mappedPoint.getX(), mappedPoint.getY());
     }
 
     private Pair<Point, Integer> getEventPointAndDisplayId(Position position) {

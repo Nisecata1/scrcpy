@@ -25,6 +25,7 @@ public final class ControlMessage {
     public static final int TYPE_OPEN_HARD_KEYBOARD_SETTINGS = 15;
     public static final int TYPE_START_APP = 16;
     public static final int TYPE_RESET_VIDEO = 17;
+    public static final int TYPE_INJECT_CURSOR = 0x80;
 
     public static final long SEQUENCE_INVALID = 0;
 
@@ -53,6 +54,10 @@ public final class ControlMessage {
     private boolean on;
     private int vendorId;
     private int productId;
+    private int cursorX;
+    private int cursorY;
+    private int cursorW;
+    private int cursorH;
 
     private ControlMessage() {
     }
@@ -166,6 +171,16 @@ public final class ControlMessage {
         return msg;
     }
 
+    public static ControlMessage createInjectCursor(int x, int y, int w, int h) {
+        ControlMessage msg = new ControlMessage();
+        msg.type = TYPE_INJECT_CURSOR;
+        msg.cursorX = x;
+        msg.cursorY = y;
+        msg.cursorW = w;
+        msg.cursorH = h;
+        return msg;
+    }
+
     public int getType() {
         return type;
     }
@@ -248,5 +263,21 @@ public final class ControlMessage {
 
     public int getProductId() {
         return productId;
+    }
+
+    public int getCursorX() {
+        return cursorX;
+    }
+
+    public int getCursorY() {
+        return cursorY;
+    }
+
+    public int getCursorW() {
+        return cursorW;
+    }
+
+    public int getCursorH() {
+        return cursorH;
     }
 }

@@ -33,6 +33,8 @@ public class ControlMessageReader {
                 return parseInjectTouchEvent();
             case ControlMessage.TYPE_INJECT_SCROLL_EVENT:
                 return parseInjectScrollEvent();
+            case ControlMessage.TYPE_INJECT_CURSOR:
+                return parseInjectCursor();
             case ControlMessage.TYPE_BACK_OR_SCREEN_ON:
                 return parseBackOrScreenOnEvent();
             case ControlMessage.TYPE_GET_CLIPBOARD:
@@ -117,6 +119,14 @@ public class ControlMessageReader {
         float vScroll = Binary.i16FixedPointToFloat(dis.readShort()) * 16;
         int buttons = dis.readInt();
         return ControlMessage.createInjectScrollEvent(position, hScroll, vScroll, buttons);
+    }
+
+    private ControlMessage parseInjectCursor() throws IOException {
+        int x = dis.readInt();
+        int y = dis.readInt();
+        int w = dis.readInt();
+        int h = dis.readInt();
+        return ControlMessage.createInjectCursor(x, y, w, h);
     }
 
     private ControlMessage parseBackOrScreenOnEvent() throws IOException {
