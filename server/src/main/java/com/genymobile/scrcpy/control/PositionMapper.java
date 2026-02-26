@@ -4,6 +4,7 @@ import com.genymobile.scrcpy.device.Point;
 import com.genymobile.scrcpy.device.Position;
 import com.genymobile.scrcpy.device.Size;
 import com.genymobile.scrcpy.util.AffineMatrix;
+import com.genymobile.scrcpy.util.Ln;
 
 public final class PositionMapper {
 
@@ -33,13 +34,33 @@ public final class PositionMapper {
 
     public Point map(Position position) {
         Size clientVideoSize = position.getScreenSize();
+        Point point = position.getPoint();
+
         if (!videoSize.equals(clientVideoSize)) {
-            // The client sends a click relative to a video with wrong dimensions,
-            // the device may have been rotated since the event was generated, so ignore the event
-            return null;
+            int clientWidth = clientVideoSize.getWidth();
+            int clientHeight = clientVideoSize.getHeight();
+            if (clientWidth <= 1 || clientHeight <= 1) {
+                Ln.w("Ignore positional event with invalid client size: " + clientVideoSize);
+                return null;
+            }
+
+            int videoWidth = videoSize.getWidth();
+            int videoHeight = videoSize.getHeight();
+            if (videoWidth <= 1 || videoHeight <= 1) {
+                Ln.w("Ignore positional event with invalid video size: " + videoSize);
+                return null;
+            }
+
+            float nx = (float) point.getX() / (clientWidth - 1);
+            float ny = (float) point.getY() / (clientHeight - 1);
+            nx = Math.max(0f, Math.min(1f, nx));
+            ny = Math.max(0f, Math.min(1f, ny));
+
+            int vx = Math.round(nx * (videoWidth - 1));
+            int vy = Math.round(ny * (videoHeight - 1));
+            point = new Point(vx, vy);
         }
 
-        Point point = position.getPoint();
         if (videoToDeviceMatrix != null) {
             point = videoToDeviceMatrix.apply(point);
         }
