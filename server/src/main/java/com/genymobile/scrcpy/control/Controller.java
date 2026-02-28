@@ -1,4 +1,4 @@
-﻿package com.genymobile.scrcpy.control;
+package com.genymobile.scrcpy.control;
 
 import com.genymobile.scrcpy.AndroidVersions;
 import com.genymobile.scrcpy.AsyncProcessor;

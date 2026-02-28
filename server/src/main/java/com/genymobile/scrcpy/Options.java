@@ -1,4 +1,4 @@
-﻿package com.genymobile.scrcpy;
+package com.genymobile.scrcpy;
 
 import com.genymobile.scrcpy.audio.AudioCodec;
 import com.genymobile.scrcpy.audio.AudioSource;
