@@ -1,4 +1,4 @@
-package com.genymobile.scrcpy.control;
+﻿package com.genymobile.scrcpy.control;
 
 import com.genymobile.scrcpy.AndroidVersions;
 import com.genymobile.scrcpy.AsyncProcessor;
@@ -82,6 +82,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
     private final DeviceMessageSender sender;
     private final boolean clipboardAutosync;
     private final boolean powerOn;
+    private final boolean controlMapToScreen;
 
     private final KeyCharacterMap charMap = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD);
 
@@ -108,6 +109,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         this.cleanUp = cleanUp;
         this.clipboardAutosync = options.getClipboardAutosync();
         this.powerOn = options.getPowerOn();
+        this.controlMapToScreen = options.getControlMapToScreen();
         initPointers();
         sender = new DeviceMessageSender(controlChannel);
 
@@ -418,6 +420,54 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         }
     }
 
+    private static int mapLogicalCoordToPixel(int logicalCoord, int pixelSpan) {
+        if (pixelSpan <= 0) {
+            return 0;
+        }
+
+        int clamped = Math.max(0, Math.min(65535, logicalCoord));
+        long mapped = ((long) clamped * pixelSpan + 32767L) / 65535L;
+        int maxIndex = pixelSpan - 1;
+        if (maxIndex < 0) {
+            maxIndex = 0;
+        }
+        if (mapped > maxIndex) {
+            mapped = maxIndex;
+        }
+        return (int) mapped;
+    }
+
+    private static Point mapFromLogical65535ToDisplay(Position position, Size displaySize) {
+        if (position == null || displaySize == null) {
+            return null;
+        }
+
+        int displayWidth = displaySize.getWidth();
+        int displayHeight = displaySize.getHeight();
+        if (displayWidth <= 0 || displayHeight <= 0) {
+            return null;
+        }
+
+        Point logicalPoint = position.getPoint();
+        int mappedX = mapLogicalCoordToPixel(logicalPoint.getX(), displayWidth);
+        int mappedY = mapLogicalCoordToPixel(logicalPoint.getY(), displayHeight);
+        return new Point(mappedX, mappedY);
+    }
+
+    private static Size resolveDisplaySize(int targetDisplayId) {
+        DisplayInfo displayInfo = ServiceManager.getDisplayManager().getDisplayInfo(targetDisplayId);
+        if (displayInfo == null) {
+            return null;
+        }
+
+        Size displaySize = displayInfo.getSize();
+        if (displaySize == null || displaySize.getWidth() <= 0 || displaySize.getHeight() <= 0) {
+            return null;
+        }
+
+        return displaySize;
+    }
+
     private Pair<Point, Integer> getEventPointAndDisplayId(Position position) {
         // it hides the field on purpose, to read it with atomic access
         @SuppressWarnings("checkstyle:HiddenField")
@@ -426,28 +476,37 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         // However, it is possible to send events without video playback when using scrcpy-server alone (except for virtual displays).
         assert displayData != null || displayId != Device.DISPLAY_ID_NONE : "Cannot receive a positional event without a display";
 
-        Point point;
-        int targetDisplayId;
-        if (displayData != null) {
-            point = displayData.positionMapper.map(position);
-            if (point == null) {
-                if (Ln.isEnabled(Ln.Level.VERBOSE)) {
-                    Size eventSize = position.getScreenSize();
-                    Size currentSize = displayData.positionMapper.getVideoSize();
-                    Ln.v("Ignore positional event generated for size " + eventSize + " (current size is " + currentSize + ")");
-                }
-                return null;
+        int targetDisplayId = displayData != null ? displayData.virtualDisplayId : displayId;
+        Point point = null;
+
+        if (controlMapToScreen) {
+            Size targetDisplaySize = resolveDisplaySize(targetDisplayId);
+            if (targetDisplaySize != null) {
+                point = mapFromLogical65535ToDisplay(position, targetDisplaySize);
+            } else {
+                Ln.w("Display size unavailable for control_map_to_screen, fallback to default mapping for display " + targetDisplayId);
             }
-            targetDisplayId = displayData.virtualDisplayId;
-        } else {
-            // No display, use the raw coordinates
-            point = position.getPoint();
-            targetDisplayId = displayId;
+        }
+
+        if (point == null) {
+            if (displayData != null) {
+                point = displayData.positionMapper.map(position);
+                if (point == null) {
+                    if (Ln.isEnabled(Ln.Level.VERBOSE)) {
+                        Size eventSize = position.getScreenSize();
+                        Size currentSize = displayData.positionMapper.getVideoSize();
+                        Ln.v("Ignore positional event generated for size " + eventSize + " (current size is " + currentSize + ")");
+                    }
+                    return null;
+                }
+            } else {
+                // No display, use the raw coordinates
+                point = position.getPoint();
+            }
         }
 
         return Pair.create(point, targetDisplayId);
     }
-
     private boolean injectTouch(int action, long pointerId, Position position, float pressure, int actionButton, int buttons) {
         long now = SystemClock.uptimeMillis();
 
@@ -798,3 +857,7 @@ public class Controller implements AsyncProcessor, VirtualDisplayListener {
         }
     }
 }
+
+
+
+

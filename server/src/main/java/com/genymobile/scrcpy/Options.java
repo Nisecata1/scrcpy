@@ -1,4 +1,4 @@
-package com.genymobile.scrcpy;
+﻿package com.genymobile.scrcpy;
 
 import com.genymobile.scrcpy.audio.AudioCodec;
 import com.genymobile.scrcpy.audio.AudioSource;
@@ -39,6 +39,7 @@ public class Options {
     private boolean tunnelForward;
     private Rect crop;
     private boolean control = true;
+    private boolean controlMapToScreen;
     private int displayId;
     private String cameraId;
     private Size cameraSize;
@@ -146,6 +147,10 @@ public class Options {
 
     public boolean getControl() {
         return control;
+    }
+
+    public boolean getControlMapToScreen() {
+        return controlMapToScreen;
     }
 
     public int getDisplayId() {
@@ -383,6 +388,9 @@ public class Options {
                     break;
                 case "control":
                     options.control = Boolean.parseBoolean(value);
+                    break;
+                case "control_map_to_screen":
+                    options.controlMapToScreen = Boolean.parseBoolean(value);
                     break;
                 case "display_id":
                     options.displayId = Integer.parseInt(value);
@@ -649,3 +657,7 @@ public class Options {
         }
     }
 }
+
+
+
+
