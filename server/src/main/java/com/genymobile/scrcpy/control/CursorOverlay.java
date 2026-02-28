@@ -204,7 +204,7 @@ final class CursorOverlay {
             }
             surfaceControl = reflection.builderBuild.invoke(builder);
 
-            surface = new Surface();
+            surface = Surface.class.newInstance();
             reflection.surfaceCopyFrom.invoke(surface, surfaceControl);
 
             drawPointerOnce();
